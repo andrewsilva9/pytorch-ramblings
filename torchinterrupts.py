@@ -19,6 +19,8 @@ lr = 1e-5
 log_interval = 1000
 running_loss = []
 
+use_gpu = torch.cuda.is_available()
+
 
 def non_shuffling_train_test_split(X, y, test_size=0.2):
     i = int((1 - test_size) * X.shape[0]) + 1
@@ -219,13 +221,17 @@ class Net(nn.Module):
         x = self.soft(self.fc5(self.relu4(self.fc4(self.relu3(self.fc3(self.relu2(self.fc2(self.relu1((self.fc1(x)))))))))))
         # x = self.soft(self.fc5(self.relu2(self.fc2(self.relu1(self.fc1(x))))))
         return x
-if torch.cuda.is_available():
+if use_gpu:
 	model = Net().cuda()
 else:
 	model = Net()
 
 optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-loss_fn = torch.nn.NLLLoss(weight=torch.cuda.FloatTensor([1, 5]), size_average=False)
+if use_gpu:
+	loss_fn = torch.nn.NLLLoss(weight=torch.cuda.FloatTensor([1, 5]), size_average=False)
+else:
+	loss_fn = torch.nn.NLLLoss(weight=torch.FloatTensor([1, 5]), size_average=False)
+
 # loss_fn = torch.nn.CrossEntropyLoss(size_average=False)
 
 
@@ -234,7 +240,7 @@ def train(epoch):
     avg_loss = 0
     count = 0
     for iteration, batch in enumerate(train_loader, 1):
-    	if torch.cuda.is_available():
+    	if use_gpu:
         	data, target = Variable(batch[0].cuda()), Variable(batch[1].cuda())
         else:
         	data, target = Variable(batch[0]), Variable(batch[1])
@@ -260,7 +266,7 @@ def test(epoch):
     false_zero = 0
     false_one = 0
     for iteration, batch in enumerate(test_loader, 1):
-    	if torch.cuda.is_available():
+    	if use_gpu:
         	data, target = Variable(batch[0].cuda()), Variable(batch[1].cuda())
         else:
         	data, target = Variable(batch[0]), Variable(batch[1])
@@ -316,7 +322,7 @@ for train_idx, test_idx in kf.split(X, Y):
     for idx in test_idx:
         real_x_test.append(X[idx])
         y_test.append(Y[idx])
-    if torch.cuda.is_available():
+    if use_gpu:
     	real_x_train = torch.cuda.FloatTensor(real_x_train)
     	y_train = torch.cuda.LongTensor(y_train)
     	real_x_test = torch.cuda.FloatTensor(real_x_test)
