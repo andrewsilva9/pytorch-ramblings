@@ -219,8 +219,10 @@ class Net(nn.Module):
         x = self.soft(self.fc5(self.relu4(self.fc4(self.relu3(self.fc3(self.relu2(self.fc2(self.relu1((self.fc1(x)))))))))))
         # x = self.soft(self.fc5(self.relu2(self.fc2(self.relu1(self.fc1(x))))))
         return x
-
-model = Net()
+if torch.cuda.is_available():
+	model = Net().cuda()
+else:
+	model = Net()
 
 optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 loss_fn = torch.nn.NLLLoss(weight=torch.FloatTensor([1, 5]), size_average=False)
@@ -232,7 +234,11 @@ def train(epoch):
     avg_loss = 0
     count = 0
     for iteration, batch in enumerate(train_loader, 1):
-        data, target = Variable(batch[0]), Variable(batch[1])
+    	if torch.cuda.is_available():
+        	data, target = Variable(batch[0].cuda()), Variable(batch[1].cuda())
+        else:
+        	data, target = Variable(batch[0]), Variable(batch[1])
+
         # output = model(data)
         loss = loss_fn(model(data), target)
         optimizer.zero_grad()
@@ -316,7 +322,7 @@ for train_idx, test_idx in kf.split(X, Y):
     	y_train = torch.LongTensor(y_train)
     	real_x_test = torch.FloatTensor(real_x_test)
     	y_test = torch.LongTensor(y_test)
-    	
+
     train_dat = data_utils.TensorDataset(real_x_train, y_train)
     train_loader = data_utils.DataLoader(train_dat, batch_size=2, shuffle=False)
 
