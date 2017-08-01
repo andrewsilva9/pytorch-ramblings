@@ -303,12 +303,13 @@ def test(epoch):
 # for index in range(len(X_test)):
 #     real_x_test.append(X_test[index])
 kf = StratifiedKFold(n_splits=5, shuffle=False)
-real_x_train = []
-real_x_test = []
-y_train = []
-y_test = []
+
 fold_number = 1
 for train_idx, test_idx in kf.split(X, Y):
+	real_x_train = []
+	real_x_test = []
+	y_train = []
+	y_test = []
     for idx in train_idx:
         real_x_train.append(X[idx])
         y_train.append(Y[idx])
