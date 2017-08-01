@@ -9,7 +9,7 @@ from torch.autograd import Variable
 import os
 import pickle
 import numpy as np
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import StratifiedKFold
 
@@ -316,6 +316,7 @@ for train_idx, test_idx in kf.split(X, Y):
     	y_train = torch.LongTensor(y_train)
     	real_x_test = torch.FloatTensor(real_x_test)
     	y_test = torch.LongTensor(y_test)
+    	
     train_dat = data_utils.TensorDataset(real_x_train, y_train)
     train_loader = data_utils.DataLoader(train_dat, batch_size=2, shuffle=False)
 
