@@ -313,7 +313,7 @@ for train_idx, test_idx in kf.split(X, Y):
         real_x_test.append(X[idx])
         y_test.append(Y[idx])
     if torch.cuda.is_available():
-    	real_x_train = torch.cuda.Tensor(real_x_train)
+    	real_x_train = torch.cuda.FloatTensor(real_x_train)
     	y_train = torch.cuda.LongTensor(y_train)
     	real_x_test = torch.cuda.FloatTensor(real_x_test)
     	y_test = torch.cuda.LongTensor(y_test)
