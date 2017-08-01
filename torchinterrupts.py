@@ -11,9 +11,10 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import StratifiedKFold
 
 batch_size = 1
-epochs = 700
+epochs = 500
 lr = 1e-5
 log_interval = 1000
 running_loss = []
@@ -30,13 +31,15 @@ def save_checkpoint(state, filename='checkpoint_rel_small075.pth.tar'):
     torch.save(state, filename)
 
 
-annots_dir = '/Users/andrewsilva/my_rel_data/'
+annots_dir = '/home/asilva/Data/int_annotations/my_rel_data/'
 X = []
 Y = []
 bad_keys = ['bb_y', 'bb_x', 'gaze_timestamp', 'pos_frame', 'send_timestamp', 'bb_height', 'pos_timestamp',
             'timestamp', 'bb_width', 'objects_timestamp', 'pos_z', 'pos_x', 'pos_y', 'name', 'pose_timestamp',
             'objects']
 for filename in os.listdir(annots_dir):
+    if os.path.isdir(os.path.join(annots_dir, filename)):
+            continue
     af = open(os.path.join(annots_dir, filename), 'rb')
     annotation = pickle.load(af)
     # For each person in the segmentation
@@ -110,7 +113,6 @@ for filename in os.listdir(annots_dir):
                 label = 1
             X.append(new_input_data)
             Y.append(label)
-
 
 
 # annots_dir = '/Users/andrewsilva/my_annots_trimmed'
@@ -195,30 +197,6 @@ for filename in os.listdir(annots_dir):
 #             Y.append(torch.FloatTensor(label))
 #
 
-split_point = int(len(X) * 0.8)
-X_train, X_test = X[:split_point], X[split_point:]
-y_train, y_test = Y[:split_point], Y[split_point:]
-# scaler = StandardScaler()
-# scaler.fit(X_train)
-# X_train = scaler.transform(X_train)
-# X_test = scaler.transform(X_test)
-real_x_train = []
-real_x_test = []
-for index in range(len(X_train)):
-    real_x_train.append(X_train[index])
-for index in range(len(X_test)):
-    real_x_test.append(X_test[index])
-
-real_x_train = torch.Tensor(real_x_train)
-y_train = torch.LongTensor(y_train)
-train_dat = data_utils.TensorDataset(real_x_train, y_train)
-train_loader = data_utils.DataLoader(train_dat, batch_size=2, shuffle=False)
-
-real_x_test = torch.FloatTensor(real_x_test)
-y_test = torch.LongTensor(y_test)
-test_dat = data_utils.TensorDataset(real_x_test, y_test)
-test_loader = data_utils.DataLoader(test_dat, batch_size=2, shuffle=False)
-
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
@@ -247,6 +225,7 @@ model = Net()
 optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 loss_fn = torch.nn.NLLLoss(weight=torch.FloatTensor([1, 5]), size_average=False)
 # loss_fn = torch.nn.CrossEntropyLoss(size_average=False)
+
 
 def train(epoch):
     model.train()
@@ -294,8 +273,8 @@ def test(epoch):
             elif pred[0] == 1 and target.data[i] == 0:
                 false_one += 1.
 
-    test_loss /= len(X_test)
-    print 'NoScaler NoDrop NLL5 SA = F: Average test loss:', test_loss, ' || Accuracy:', (100.*correct/len(X_test))
+    test_loss /= len(test_loader.dataset)
+    print 'NoScaler NoDrop NLL5 SA = F: Average test loss:', test_loss, ' || Accuracy:', (100.*correct/len(test_loader.dataset))
 
     total_zero = true_zero + false_one
     total_one = true_one + false_zero
@@ -303,16 +282,59 @@ def test(epoch):
     print false_zero/total_one, ' ', true_one/total_one
     return test_loss
 
-train_loss = []
-test_loss = []
-for epoch in range(epochs):
-    train_loss.append(train(epoch))
-    test_loss.append(test(epoch))
-    save_checkpoint({
-        'epoch': epoch + 1,
-        'state_dict': model.state_dict(),
-        'optimizer': optimizer.state_dict(),
-    })
+# split_point = int(len(X) * 0.8)
+# X_train, X_test = X[:split_point], X[split_point:]
+# y_train, y_test = Y[:split_point], Y[split_point:]
+# scaler = StandardScaler()
+# scaler.fit(X_train)
+# X_train = scaler.transform(X_train)
+# X_test = scaler.transform(X_test)
+# for index in range(len(X_train)):
+#     real_x_train.append(X_train[index])
+# for index in range(len(X_test)):
+#     real_x_test.append(X_test[index])
+kf = StratifiedKFold(n_splits=5, shuffle=False)
+real_x_train = []
+real_x_test = []
+y_train = []
+y_test = []
+fold_number = 1
+for train_idx, test_idx in kf.split(X, Y):
+    for idx in train_idx:
+        real_x_train.append(X[idx])
+        y_train.append(Y[idx])
+    for idx in test_idx:
+        real_x_test.append(X[idx])
+        y_test.append(Y[idx])
+    if torch.cuda.is_available():
+    	real_x_train = torch.cuda.Tensor(real_x_train)
+    	y_train = torch.cuda.LongTensor(y_train)
+    	real_x_test = torch.cuda.FloatTensor(real_x_test)
+    	y_test = torch.cuda.LongTensor(y_test)
+    else:
+    	real_x_train = torch.Tensor(real_x_train)
+    	y_train = torch.LongTensor(y_train)
+    	real_x_test = torch.FloatTensor(real_x_test)
+    	y_test = torch.LongTensor(y_test)
+    train_dat = data_utils.TensorDataset(real_x_train, y_train)
+    train_loader = data_utils.DataLoader(train_dat, batch_size=2, shuffle=False)
 
-plt.plot(train_loss, 'r', test_loss, 'b')
-plt.show()
+    
+    test_dat = data_utils.TensorDataset(real_x_test, y_test)
+    test_loader = data_utils.DataLoader(test_dat, batch_size=2, shuffle=False)
+
+    train_loss = []
+    test_loss = []
+    for epoch in range(epochs):
+    	if epoch % 50 == 0:
+        	print 'Fold#: ', fold_number
+        train_loss.append(train(epoch))
+        test_loss.append(test(epoch))
+        save_checkpoint({
+            'epoch': epoch + 1,
+            'state_dict': model.state_dict(),
+            'optimizer': optimizer.state_dict(),
+        })
+    fold_number += 1
+    # plt.plot(train_loss, 'r', test_loss, 'b')
+    # plt.show()
