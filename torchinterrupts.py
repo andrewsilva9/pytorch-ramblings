@@ -225,7 +225,7 @@ else:
 	model = Net()
 
 optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-loss_fn = torch.nn.NLLLoss(weight=torch.FloatTensor([1, 5]), size_average=False)
+loss_fn = torch.nn.NLLLoss(weight=torch.cuda.FloatTensor([1, 5]), size_average=False)
 # loss_fn = torch.nn.CrossEntropyLoss(size_average=False)
 
 
@@ -260,7 +260,10 @@ def test(epoch):
     false_zero = 0
     false_one = 0
     for iteration, batch in enumerate(test_loader, 1):
-        data, target = Variable(batch[0]), Variable(batch[1])
+    	if torch.cuda.is_available():
+        	data, target = Variable(batch[0].cuda()), Variable(batch[1].cuda())
+        else:
+        	data, target = Variable(batch[0]), Variable(batch[1])
         output = model(data)
         loss = loss_fn(output, target)
         test_loss += loss.data[0]
