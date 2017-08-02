@@ -264,6 +264,7 @@ def test(model, test_loader, loss_fn, optimizer, epoch):
         output = model(data)
         loss = loss_fn(output, target)
         test_loss += loss.data[0]
+        # Wow, am I this dumb?
         # optimizer.zero_grad()
         # loss.backward()
         # optimizer.step()
@@ -280,12 +281,17 @@ def test(model, test_loader, loss_fn, optimizer, epoch):
                 false_one += 1.
 
     test_loss /= len(test_loader.dataset)
+    fn = open(os.path.join(os.getcwd(), 'output.txt'), "a")
     print 'NoScaler NoDrop NLL5 SA = F: Average test loss:', test_loss, ' || Accuracy:', (100.*correct/len(test_loader.dataset))
-
+    fn.write('Epoch: ' + str(epoch) + '\n')
+    fn.write('NoScaler NoDrop NLL5 SA = F: Average test loss:' + str(test_loss) + ' || Accuracy:' +
+             str((100.*correct/len(test_loader.dataset))) + '\n')
     total_zero = true_zero + false_one
     total_one = true_one + false_zero
     print true_zero/total_zero, ' ', false_one/total_zero
     print false_zero/total_one, ' ', true_one/total_one
+    fn.write(str(true_zero/total_zero) + '|' + str(false_one/total_zero) + '\n')
+    fn.write(str(false_zero/total_one) + '|' + str(true_one/total_one) + '\n')
     return test_loss
 
 # split_point = int(len(X) * 0.8)
@@ -310,16 +316,6 @@ def run_cross_val(X, Y, filename='checkpoint_rel_small075.pth.tar'):
         real_x_test = []
         y_train = []
         y_test = []
-        if use_gpu:
-            model = Net().cuda()
-        else:
-            model = Net()
-
-        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-        if use_gpu:
-            loss_fn = torch.nn.NLLLoss(weight=torch.cuda.FloatTensor([1, 5]), size_average=False)
-        else:
-            loss_fn = torch.nn.NLLLoss(weight=torch.FloatTensor([1, 5]), size_average=False)
 
         for idx in train_idx:
             real_x_train.append(X[idx])
@@ -345,28 +341,86 @@ def run_cross_val(X, Y, filename='checkpoint_rel_small075.pth.tar'):
         test_dat = data_utils.TensorDataset(real_x_test, y_test)
         test_loader = data_utils.DataLoader(test_dat, batch_size=2, shuffle=False)
 
+        if use_gpu:
+            model = Net().cuda()
+            loss_fn = torch.nn.NLLLoss(weight=torch.cuda.FloatTensor([1, 5]), size_average=False)
+        else:
+            model = Net()
+            loss_fn = torch.nn.NLLLoss(weight=torch.FloatTensor([1, 5]), size_average=False)
+
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
         train_loss = []
         test_loss = []
         for epoch in range(epochs):
             if epoch % 50 == 0:
                 print 'Fold#: ', fold_number
+                fn = open(os.path.join(os.getcwd(), 'output.txt'), "a")
+                fn.write('Fold: ' + str(fold_number) + '\n')
+                fn.close()
             train_loss.append(train(model=model, train_loader=train_loader, loss_fn=loss_fn, optimizer=optimizer, epoch=epoch))
             test_loss.append(test(model=model, test_loader=test_loader, loss_fn=loss_fn, optimizer=optimizer, epoch=epoch))
-            save_checkpoint({
-                'epoch': epoch + 1,
-                'state_dict': model.state_dict(),
-                'optimizer': optimizer.state_dict(),
-            }, filename=filename)
+            # save_checkpoint({
+            #     'epoch': epoch + 1,
+            #     'state_dict': model.state_dict(),
+            #     'optimizer': optimizer.state_dict(),
+            # }, filename=filename)
         fold_number += 1
         # plt.plot(train_loss, 'r', test_loss, 'b')
         # plt.show()
 
 
-def load_and_test(filename='checkpoint_rel_small075.pth.tar'):
-    pass
+def load_and_test(X, Y, filename='checkpoint_rel_small075.pth.tar'):
+    real_x_test = []
+    y_test = []
+    true_zero = 0
+    true_one = 0
+    false_zero = 0
+    false_one = 0
+    for index in range(len(X)):
+        if use_gpu:
+            real_x_test.append(torch.cuda.FloatTensor(X[index]))
+            y_test.append(Y[index])
+        else:
+            real_x_test.append(torch.FloatTensor(X[index]))
+            y_test.append(Y[index])
+    if use_gpu:
+        model = Net().cuda()
+    else:
+        model = Net()
+    checkpoint = torch.load(filename)
+    model.load_state_dict(checkpoint['state_dict'])
+    model.eval()
+
+    for sample, ground_truth in zip(real_x_test, y_test):
+        data, target = Variable(sample), ground_truth
+        output = model(data)
+        # loss = loss_fn(output, target)
+        # test_loss += loss.data[0]
+        # Wow, am I this dumb?
+        # optimizer.zero_grad()
+        # loss.backward()
+        # optimizer.step()
+        # print output.data.max(1)[1][0] --> Gives me an int prediction for a single sample
+        for i in range(int(output.size()[0])):
+            pred = output.data.max(1)[1][i]
+            # correct += pred.eq(target.data[i]).cpu().sum()
+            if pred[0] == 0 and target == 0:
+                true_zero += 1.
+            elif pred[0] == 0 and target == 1:
+                false_zero += 1.
+            elif pred[0] == 1 and target == 1:
+                true_one += 1.
+            elif pred[0] == 1 and target == 0:
+                false_one += 1.
+    total_zero = true_zero + false_one
+    total_one = true_one + false_zero
+    print true_zero/total_zero, ' ', false_one/total_zero
+    print false_zero/total_one, ' ', true_one/total_one
 
 
 if __name__ == '__main__':
     model_name = 'checkpoint_rel_small075.pth.tar'
     X, Y = import_rel_data()
-    run_cross_val(X, Y)
+    run_cross_val(X, Y, model_name)
+    # load_and_test(X, Y, model_name)
