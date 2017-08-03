@@ -232,7 +232,7 @@ def train(model, train_loader, loss_fn, optimizer, epoch):
     count = 0
     for iteration, batch in enumerate(train_loader, 1):
         if use_gpu:
-            data, target = Variable(batch[0].cuda()), Variable(batch[1].cuda())
+            data, target = Variable(batch[0].cuda()).cuda(), Variable(batch[1].cuda()).cuda()
         else:
             data, target = Variable(batch[0]), Variable(batch[1])
 
@@ -258,7 +258,7 @@ def test(model, test_loader, loss_fn, optimizer, epoch):
     false_one = 0
     for iteration, batch in enumerate(test_loader, 1):
         if use_gpu:
-            data, target = Variable(batch[0].cuda()), Variable(batch[1].cuda())
+            data, target = Variable(batch[0].cuda()).cuda(), Variable(batch[1].cuda()).cuda()
         else:
             data, target = Variable(batch[0]), Variable(batch[1])
         output = model(data)
@@ -343,7 +343,7 @@ def run_cross_val(X, Y, filename='checkpoint_rel_small075.pth.tar'):
 
         if use_gpu:
             model = Net().cuda()
-            loss_fn = torch.nn.NLLLoss(weight=torch.cuda.FloatTensor([1, 5]), size_average=False)
+            loss_fn = torch.nn.NLLLoss(weight=torch.cuda.FloatTensor([1, 5]), size_average=False).cuda()
         else:
             model = Net()
             loss_fn = torch.nn.NLLLoss(weight=torch.FloatTensor([1, 5]), size_average=False)
